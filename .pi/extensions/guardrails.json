@@ -38,6 +38,14 @@
       {
         "kind": "directory",
         "path": "~/.pi-lens/projects/home-thomas-src-pi-auth-broker-909c6c44/cache"
+      },
+      {
+        "kind": "file",
+        "path": "~/.npmrc"
+      },
+      {
+        "kind": "directory",
+        "path": "/usr/lib/node_modules/pi/packages/coding-agent/dist/core"
       }
     ]
   }

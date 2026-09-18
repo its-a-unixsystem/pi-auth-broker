@@ -10,3 +10,4 @@ node_modules/
 # Test/dev scratch
 *.log
 /tmp/
+.env
