@@ -83,6 +83,79 @@ are peer-provided by the running pi process.
 
 Then just use `anthropic/…` or `openai-codex/…` models normally.
 
+### What `/login` does with this extension active
+
+**No new token is created.** With the extension loaded, `/login <provider>` never
+runs an OAuth flow, opens a browser, or contacts OpenAI/Anthropic. It is reduced
+purely to *account selection*:
+
+```
+/login openai-codex
+  → GET /v1/snapshot from the broker
+  → account picker (only shown when the broker holds several credentials)
+  → chosen credential copied into auth.json
+```
+
+Tokens are created exactly once, centrally, at the broker:
+
+```bash
+omp auth-broker login openai-codex   # browser flow runs here; token lives in the broker
+```
+
+Any pi instance then just picks an account via `/login`.
+
+Notes on `/omp-auth status` output:
+
+- `[active]` is per-provider, not per-account — pi stores exactly one credential
+  per provider, so with two broker accounts both show `[active]` while only the
+  selected one is stored. Switch accounts by running `/login` again and picking
+  the other entry.
+- `not managed` entries are broker credentials this extension has no pi provider
+  wired up for (see recipe below).
+
+To return to pi's native OAuth (local refresh token, no broker): remove the
+extension (`pi remove git:github.com/its-a-unixsystem/pi-auth-broker` or
+`pi remove npm:pi-auth-broker`), restart pi, and `/login` again.
+
+### Using other broker credentials (recipe)
+
+Yes — any broker entry is just a provider registration away. Two kinds:
+
+**OAuth entries** (perplexity, devin) work exactly like the builtins above:
+add a `buildOauthAdapter(...)` call plus a `PROVIDERS` entry in `index.ts` —
+but you also need a pi provider with models, API mapping, and baseUrl, which
+pi only ships builtins for.
+
+**API-key entries on OpenAI-compatible endpoints** (nanogpt) are simpler —
+register a provider whose `apiKey` comes from the broker snapshot. nanogpt's
+endpoint is OpenAI v1-compatible at `https://nano-gpt.com/api/v1` (model list
+at `GET /v1/models`). Sketch to add to the extension factory in `index.ts`:
+
+```ts
+const snap = await broker.snapshotRequest().catch(() => undefined);
+const nano = snap?.credentials.find((c) => c.provider === "nanogpt");
+if (nano?.credential.type === "api_key") {
+  pi.registerProvider("nanogpt", {
+    baseUrl: "https://nano-gpt.com/api/v1",
+    api: "openai-completions",           // pi's OpenAI chat-completions API layer
+    apiKey: nano.credential.key,          // served by the broker; re-register to rotate
+    models: [
+      // pick from GET https://nano-gpt.com/api/v1/models — fill in real values:
+      { id: "mistralai/mistral-small-24b-instruct-2501", name: "Mistral Small 24B",
+        reasoning: false, input: ["text"],
+        contextWindow: 128000, maxTokens: 16384,
+        cost: { input: 0.1, output: 0.3, cacheRead: 0, cacheWrite: 0 } },
+      // …more entries…
+    ],
+  });
+}
+```
+
+Then `/model nanogpt/…` works like any builtin. (API keys don't rotate through
+the OAuth refresh path — `/omp-auth refresh nanogpt` isn't wired for them;
+re-run `omp auth-broker login nanogpt` at the broker and restart pi, or send a
+PR adding a re-registration on snapshot generation bumps.)
+
 ## Files
 
 | File | Role |
@@ -109,6 +182,21 @@ writes, long-poll generation bumps, and the 401 data path.
 - SSE push (long-poll chosen instead)
 - Encrypted offline snapshot cache (memory only)
 - `POST /v1/credential/:id/block`
-- Providers beyond pi's builtins (perplexity/devin/nanogpt etc.)
+- Providers beyond pi's builtins — see the recipe above if you want them
 
 See `PRD.md` for the original requirements and `PLAN.md` for design decisions.
+
+## Gallery listing (pi.dev/packages)
+
+The [package gallery](https://pi.dev/packages) indexes **npm** packages
+carrying the `pi-package` keyword — git-only repos are not listed. This repo
+is npm-ready (`files`, `peerDependencies`, keyword all set):
+
+```bash
+npm login
+npm publish            # from the repo root
+```
+
+Once published as `npm:pi-auth-broker`, it appears on the gallery and installs
+with `pi install npm:pi-auth-broker`. Keep the `pi-package` keyword on every
+release or the listing drops.

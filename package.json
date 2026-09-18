@@ -8,6 +8,14 @@
   },
   "keywords": ["pi", "pi-extension", "pi-package", "auth-broker", "omp", "oauth"],
   "license": "MIT",
+  "author": "its-a-unixsystem",
+  "files": [
+    "index.ts",
+    "broker.ts",
+    "auth.ts",
+    "README.md",
+    "LICENSE"
+  ],
   "pi": {
     "extensions": ["./index.ts"]
   },
