@@ -1,12 +1,19 @@
 {
   "name": "pi-auth-broker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "pi extension delegating OAuth credential lifecycle for anthropic and openai-codex to the local omp auth-broker daemon",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/its-a-unixsystem/pi-auth-broker.git"
   },
-  "keywords": ["pi", "pi-extension", "pi-package", "auth-broker", "omp", "oauth"],
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "auth-broker",
+    "omp",
+    "oauth"
+  ],
   "license": "MIT",
   "author": "its-a-unixsystem",
   "files": [
@@ -17,7 +24,9 @@
     "LICENSE"
   ],
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": [
+      "./index.ts"
+    ]
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

@@ -117,44 +117,53 @@ To return to pi's native OAuth (local refresh token, no broker): remove the
 extension (`pi remove git:github.com/its-a-unixsystem/pi-auth-broker` or
 `pi remove npm:pi-auth-broker`), restart pi, and `/login` again.
 
-### Using other broker credentials (recipe)
+### Using other broker credentials
 
-Yes — any broker entry is just a provider registration away. Two kinds:
+**nanogpt (api_key) — auth wiring shipped, catalog is yours.** When the broker
+snapshot holds a `nanogpt` api_key credential, the extension registers the
+provider with the broker's key (baseUrl `https://nano-gpt.com/api/v1`, OpenAI
+chat-completions). No models are hardcoded — list the ones you use in
+`~/.pi/agent/models.json` and pi merges them into the provider natively:
 
-**OAuth entries** (perplexity, devin) work exactly like the builtins above:
-add a `buildOauthAdapter(...)` call plus a `PROVIDERS` entry in `index.ts` —
-but you also need a pi provider with models, API mapping, and baseUrl, which
-pi only ships builtins for.
-
-**API-key entries on OpenAI-compatible endpoints** (nanogpt) are simpler —
-register a provider whose `apiKey` comes from the broker snapshot. nanogpt's
-endpoint is OpenAI v1-compatible at `https://nano-gpt.com/api/v1` (model list
-at `GET /v1/models`). Sketch to add to the extension factory in `index.ts`:
-
-```ts
-const snap = await broker.snapshotRequest().catch(() => undefined);
-const nano = snap?.credentials.find((c) => c.provider === "nanogpt");
-if (nano?.credential.type === "api_key") {
-  pi.registerProvider("nanogpt", {
-    baseUrl: "https://nano-gpt.com/api/v1",
-    api: "openai-completions",           // pi's OpenAI chat-completions API layer
-    apiKey: nano.credential.key,          // served by the broker; re-register to rotate
-    models: [
-      // pick from GET https://nano-gpt.com/api/v1/models — fill in real values:
-      { id: "mistralai/mistral-small-24b-instruct-2501", name: "Mistral Small 24B",
-        reasoning: false, input: ["text"],
-        contextWindow: 128000, maxTokens: 16384,
-        cost: { input: 0.1, output: 0.3, cacheRead: 0, cacheWrite: 0 } },
-      // …more entries…
-    ],
-  });
+```json
+{
+  "providers": {
+    "nanogpt": {
+      "api": "openai-completions",
+      "baseUrl": "https://nano-gpt.com/api/v1",
+      "models": [
+        {
+          "id": "z-ai/glm-5.3-flash",
+          "name": "GLM 5.3 Flash",
+          "input": ["text"],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": { "input": 0.1, "output": 0.4, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
 }
 ```
 
-Then `/model nanogpt/…` works like any builtin. (API keys don't rotate through
-the OAuth refresh path — `/omp-auth refresh nanogpt` isn't wired for them;
-re-run `omp auth-broker login nanogpt` at the broker and restart pi, or send a
-PR adding a re-registration on snapshot generation bumps.)
+- Model ids come from `GET https://nano-gpt.com/api/v1/models` (≈600 entries).
+- Keep `baseUrl` and `api` exactly as above (pi validates models.json entries on
+  their own, before the extension's auth wiring is applied). The `apiKey` is
+  the one thing you never set — the extension injects the broker's key.
+- `cost`/`contextWindow`/`maxTokens` are your guesses; set them per model when
+  you care about the usage display.
+- API keys don't rotate through the OAuth refresh path: after
+  `omp auth-broker login nanogpt`, restart pi so the extension re-registers
+  with the new key.
+- Without a nanogpt credential in the broker, the provider isn't registered
+  and models.json nanogpt entries stay unconfigured.
+
+`/omp-auth status` shows nanogpt as `(api-key)` once wired.
+
+**OAuth entries** (perplexity, devin) would follow the builtin pattern —
+`buildOauthAdapter(...)` plus a `PROVIDERS` entry in `index.ts` — but also
+need a full provider definition (models, API mapping, baseUrl), which pi only
+ships builtins for. PRs welcome.
 
 ## Files
 
@@ -182,7 +191,7 @@ writes, long-poll generation bumps, and the 401 data path.
 - SSE push (long-poll chosen instead)
 - Encrypted offline snapshot cache (memory only)
 - `POST /v1/credential/:id/block`
-- Providers beyond pi's builtins — see the recipe above if you want them
+- OAuth providers beyond pi's builtins (perplexity, devin) — would need full provider+model definitions. nanogpt is wired (see above); PRs welcome.
 
 See `PRD.md` for the original requirements and `PLAN.md` for design decisions.
 
