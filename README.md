@@ -1,10 +1,14 @@
 # pi-auth-broker
 
+[![Install with pi](https://img.shields.io/badge/pi-extension-7c3aed)](https://github.com/its-a-unixsystem/pi-auth-broker)
+
 A [pi](https://www.npmjs.com/package/@mariozechner/pi) extension that delegates OAuth
 credential lifecycle for `anthropic` and `openai-codex` to the local
 [`omp auth-broker`](https://github.com/ingenire/omp) daemon — so multiple pi/omp
 clients share tokens with zero refresh races, and the client never holds a real
 refresh token.
+
+Install: `pi install git:github.com/its-a-unixsystem/pi-auth-broker`
 
 ```
 ┌──── pi ────┐        ┌──────────────────┐       ┌─────────────┐
@@ -53,15 +57,19 @@ No configuration → the extension stays inert and builtin auth is unaffected.
 ### Install
 
 ```bash
-# From the repo:
-pi -e /path/to/pi-auth-broker/index.ts
+# From GitHub (persisted to ~/.pi/agent/settings.json):
+pi install git:github.com/its-a-unixsystem/pi-auth-broker
 
-# Or permanently:
-ln -s /path/to/pi-auth-broker ~/.pi/agent/extensions/pi-auth-broker
+# Try it once, without installing:
+pi -e git:github.com/its-a-unixsystem/pi-auth-broker
+
+# Or a local dev checkout:
+pi install /path/to/pi-auth-broker
 ```
 
-No `npm install` needed — TypeScript is loaded by pi's jiti runtime, and the
-extension uses only Node stdlib.
+No `npm install` needed — zero runtime dependencies (Node stdlib only),
+TypeScript is loaded by pi's jiti runtime, and `pi` / `@earendil-works/pi-ai`
+are peer-provided by the running pi process.
 
 ## Usage
 
