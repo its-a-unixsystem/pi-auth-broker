@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "skipLibCheck": true,
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@earendil-works/pi-coding-agent": ["/usr/lib/node_modules/pi/packages/coding-agent/dist/index.d.ts"],
+      "@earendil-works/pi-ai": ["/usr/lib/node_modules/pi/node_modules/@earendil-works/pi-ai/dist/index.d.ts"]
+    }
+  },
+  "include": ["broker.ts", "auth.ts", "index.ts", "test"]
+}

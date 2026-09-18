@@ -1,0 +1,12 @@
+# Editor/tool cruft, auto-generated
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+
+# Node
+node_modules/
+
+# Test/dev scratch
+*.log
+/tmp/

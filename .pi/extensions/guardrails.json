@@ -1,0 +1,44 @@
+{
+  "$schema": "https://unpkg.com/@aliou/pi-guardrails@0.17.1/schema.json",
+  "policies": {
+    "rules": [
+      {
+        "id": "example-secret-env-files",
+        "name": "Secret env files",
+        "description": "Block .env files and variants",
+        "patterns": [
+          {
+            "pattern": ".env"
+          },
+          {
+            "pattern": ".env.*"
+          }
+        ],
+        "allowedPatterns": [
+          {
+            "pattern": ".env.example"
+          },
+          {
+            "pattern": "*.sample.env"
+          }
+        ],
+        "protection": "noAccess",
+        "onlyIfExists": true,
+        "enabled": true
+      }
+    ]
+  },
+  "version": "0.17.1",
+  "pathAccess": {
+    "allowedPaths": [
+      {
+        "kind": "directory",
+        "path": "/tmp"
+      },
+      {
+        "kind": "directory",
+        "path": "~/.pi-lens/projects/home-thomas-src-pi-auth-broker-909c6c44/cache"
+      }
+    ]
+  }
+}
