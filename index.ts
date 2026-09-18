@@ -41,25 +41,7 @@ const MANAGED = new Map<string, { brokerProvider: string; display: string }>(
 	Object.entries(PROVIDERS).map(([brokerProvider, v]) => [v.pi, { brokerProvider, display: v.display }]),
 );
 
-/**
- * nanogpt: OpenAI-compatible aggregator (https://nano-gpt.com/api/v1), served by the
- * broker as an `api_key` credential. Registered with a small seed catalog; add more
- * via `~/.pi/agent/models.json` (see README) — entries there are merged in by pi.
- */
-const NANOGPT_BASE_URL = "https://nano-gpt.com/api/v1";
-const NANOGPT_SEED_MODELS: Array<{ id: string; name: string; reasoning?: boolean }> = [
-	{ id: "z-ai/glm-5.3-flash", name: "GLM 5.3 Flash (nanogpt)" },
-	{ id: "anthropic/claude-sonnet-5", name: "Claude Sonnet 5 (nanogpt)" },
-	{ id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5 (nanogpt)" },
-	{ id: "openai/gpt-5.5", name: "GPT-5.5 (nanogpt)", reasoning: true },
-	{ id: "openai/gpt-5.4-mini", name: "GPT-5.4 Mini (nanogpt)", reasoning: true },
-	{ id: "openai/gpt-5.1-codex", name: "GPT-5.1 Codex (nanogpt)", reasoning: true },
-	{ id: "google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (nanogpt)" },
-	{ id: "moonshotai/kimi-k3", name: "Kimi K3 (nanogpt)" },
-	{ id: "minimax/minimax-m2.7", name: "MiniMax M2.7 (nanogpt)" },
-];
-
-export default async function (pi: ExtensionAPI) {
+export default function (pi: ExtensionAPI) {
 	const config = resolveConfig();
 
 	if (!config || !config.token) {
@@ -89,37 +71,6 @@ export default async function (pi: ExtensionAPI) {
 				getApiKey: (credentials) => oauth.getApiKey(credentials),
 			},
 		});
-	}
-
-	// --- nanogpt: api_key credential from the broker → OpenAI-compatible provider ---
-	// ponytail: literal key registered at load; rotates only on pi restart (re-login at
-	// the broker then restart). Wire a re-registration on snapshot generation bumps if
-	// nanogpt key rotation ever matters in practice.
-	try {
-		// Bounded so an unreachable broker doesn't stall extension load.
-		const snap = await broker.snapshotRequest({ signal: AbortSignal.timeout(4000) });
-		const nano = snap?.credentials.find((c) => c.provider === "nanogpt");
-		if (nano?.credential.type === "api_key" && typeof nano.credential.key === "string") {
-			pi.registerProvider("nanogpt", {
-				baseUrl: NANOGPT_BASE_URL,
-				api: "openai-completions",
-				apiKey: nano.credential.key,
-				models: NANOGPT_SEED_MODELS.map((m) => ({
-					id: m.id,
-					name: m.name,
-					reasoning: m.reasoning ?? false,
-					input: ["text"],
-					// nanogpt per-model pricing varies; 0s keep pi's usage display quiet.
-					// Override via models.json when you care.
-					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-					contextWindow: 128000,
-					maxTokens: 16384,
-				})),
-			});
-		}
-	} catch {
-		// Broker unreachable at load — nanogpt stays unregistered this session; the
-		// session_start handler reports broker reachability separately.
 	}
 
 	// --- Long-poll watcher (starts on session_start, aborts on session_shutdown) ---
@@ -261,16 +212,15 @@ export default async function (pi: ExtensionAPI) {
 			}
 			for (const c of snap?.credentials ?? []) {
 				const known = PROVIDERS[c.provider];
-				const isNano = c.provider === "nanogpt" && c.credential.type === "api_key";
-				const account = c.credential.email ?? c.credential.accountId ?? (isNano ? "api key" : "?");
+				const account = c.credential.email ?? c.credential.accountId ?? "?";
 				const expiresIn =
 					// Guard against second-precision epochs (pre-2001 in ms) or missing values.
 					typeof c.credential.expires === "number" && c.credential.expires > 1e12 && snap
 						? formatDuration(c.credential.expires - snap.serverNowMs)
-						: "static";
-				const scope = known ? "" : isNano ? " (api-key)" : " (not managed)";
+						: "?";
+				const scope = known ? "" : " (not managed)";
 				const active = known && readStoredCredential(known.pi) ? " [active]" : "";
-				lines.push(`  #${c.id} ${c.provider}${scope}: ${account}, expires ${expiresIn === "static" ? "never (static key)" : `in ${expiresIn}`}${active}`);
+				lines.push(`  #${c.id} ${c.provider}${scope}: ${account}, expires in ${expiresIn}${active}`);
 			}
 			if (!snap?.credentials.length) lines.push("  (no credentials)");
 			ctx.ui.notify(lines.join("\n"), "info");
