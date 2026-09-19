@@ -2,20 +2,44 @@
 
 [![Install with pi](https://img.shields.io/badge/pi-extension-7c3aed)](https://github.com/its-a-unixsystem/pi-auth-broker)
 
-A [pi](https://www.npmjs.com/package/@mariozechner/pi) extension that delegates OAuth
-credential lifecycle for `anthropic` and `openai-codex` to the local
-[`omp auth-broker`](https://github.com/ingenire/omp) daemon — so multiple pi/omp
-clients share tokens with zero refresh races, and the client never holds a real
-refresh token.
+Reuse the OAuth credentials your [`omp auth-broker`](https://github.com/can1357/oh-my-pi/blob/main/docs/auth-broker-gateway.md)
+daemon already holds. This [pi](https://www.npmjs.com/package/@mariozechner/pi)
+extension is a thin client for that existing vault: it makes pi's `anthropic`
+and `openai-codex` providers authenticate with broker-served tokens, so all
+your pi and omp sessions share one credential pool with zero refresh races —
+and pi never stores a real refresh token.
+
+You log in **once, at the broker** (`omp auth-broker login anthropic`); every
+pi instance then just picks an account. No second vault, no duplicated OAuth
+flows, no new tokens.
 
 Install: `pi install git:github.com/its-a-unixsystem/pi-auth-broker`
 
-```
+```text
 ┌──── pi ────┐        ┌──────────────────┐       ┌─────────────┐
 │ auth.json  │◄───────│  pi-auth-broker  │──────►│ omp         │
 │ (sentinel) │ login/ │  (this extension)│  HTTP │ auth-broker │
 └────────────┘ refresh└──────────────────┘       │ (127.0.0.1) │
                                                 └─────────────┘
+```
+
+## The auth-broker (not part of this project)
+
+The daemon lives in [omp](https://github.com/can1357/oh-my-pi) ("oh-my-pi") —
+there is no independent auth-broker project. `omp auth-broker serve` holds the
+canonical SQLite credential vault, refreshes OAuth tokens in the background,
+and exposes a small documented HTTP API under `/v1` (snapshot, refresh, health)
+protected by a bearer token. Any client can speak that protocol; this extension
+is simply the pi client for it — the same role omp's own remote clients play.
+
+Reference: [docs/auth-broker-gateway.md](https://github.com/can1357/oh-my-pi/blob/main/docs/auth-broker-gateway.md)
+
+Typical broker lifecycle (unchanged by this extension):
+
+```bash
+omp auth-broker serve                  # daemon on 127.0.0.1:8765
+omp auth-broker login anthropic        # credentials are created HERE, once
+omp auth-broker token                  # bearer token for clients
 ```
 
 ## How it works
@@ -41,9 +65,10 @@ Install: `pi install git:github.com/its-a-unixsystem/pi-auth-broker`
 
 ## Setup
 
-Requires: [pi](https://www.npmjs.com/package/@mariozechner/pi) ≥ 0.85, a running
-`omp auth-broker` on 127.0.0.1:8765, at least one credential logged in
-(`omp auth-broker login anthropic`).
+Requires: [pi](https://www.npmjs.com/package/@mariozechner/pi) ≥ 0.85, an
+`omp auth-broker` already running (default `127.0.0.1:8765`) with at least one
+credential logged in — i.e. the setup you already have for omp. This extension
+adds no infrastructure; it only reads from what the broker already serves.
 
 Configuration resolves in this order (first hit wins):
 
