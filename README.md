@@ -117,53 +117,14 @@ To return to pi's native OAuth (local refresh token, no broker): remove the
 extension (`pi remove git:github.com/its-a-unixsystem/pi-auth-broker` or
 `pi remove npm:pi-auth-broker`), restart pi, and `/login` again.
 
-### Using other broker credentials
+### Other broker credentials
 
-**nanogpt (api_key) — auth wiring shipped, catalog is yours.** When the broker
-snapshot holds a `nanogpt` api_key credential, the extension registers the
-provider with the broker's key (baseUrl `https://nano-gpt.com/api/v1`, OpenAI
-chat-completions). No models are hardcoded — list the ones you use in
-`~/.pi/agent/models.json` and pi merges them into the provider natively:
-
-```json
-{
-  "providers": {
-    "nanogpt": {
-      "api": "openai-completions",
-      "baseUrl": "https://nano-gpt.com/api/v1",
-      "models": [
-        {
-          "id": "z-ai/glm-5.3-flash",
-          "name": "GLM 5.3 Flash",
-          "input": ["text"],
-          "contextWindow": 128000,
-          "maxTokens": 16384,
-          "cost": { "input": 0.1, "output": 0.4, "cacheRead": 0, "cacheWrite": 0 }
-        }
-      ]
-    }
-  }
-}
-```
-
-- Model ids come from `GET https://nano-gpt.com/api/v1/models` (≈600 entries).
-- Keep `baseUrl` and `api` exactly as above (pi validates models.json entries on
-  their own, before the extension's auth wiring is applied). The `apiKey` is
-  the one thing you never set — the extension injects the broker's key.
-- `cost`/`contextWindow`/`maxTokens` are your guesses; set them per model when
-  you care about the usage display.
-- API keys don't rotate through the OAuth refresh path: after
-  `omp auth-broker login nanogpt`, restart pi so the extension re-registers
-  with the new key.
-- Without a nanogpt credential in the broker, the provider isn't registered
-  and models.json nanogpt entries stay unconfigured.
-
-`/omp-auth status` shows nanogpt as `(api-key)` once wired.
-
-**OAuth entries** (perplexity, devin) would follow the builtin pattern —
-`buildOauthAdapter(...)` plus a `PROVIDERS` entry in `index.ts` — but also
-need a full provider definition (models, API mapping, baseUrl), which pi only
-ships builtins for. PRs welcome.
+The extension manages pi's builtin OAuth providers (`anthropic`,
+`openai-codex`). Other broker entries (perplexity, devin, nanogpt, …) are
+deliberately out of scope — wiring them means registering a full custom
+provider (models, API mapping, baseUrl) in addition to auth, which is a
+per-provider project of its own. `/omp-auth status` lists them as
+`not managed`.
 
 ## Files
 
@@ -191,7 +152,7 @@ writes, long-poll generation bumps, and the 401 data path.
 - SSE push (long-poll chosen instead)
 - Encrypted offline snapshot cache (memory only)
 - `POST /v1/credential/:id/block`
-- OAuth providers beyond pi's builtins (perplexity, devin) — would need full provider+model definitions. nanogpt is wired (see above); PRs welcome.
+- Providers beyond pi's builtins — deliberately out of scope (see "Other broker credentials")
 
 See `PRD.md` for the original requirements and `PLAN.md` for design decisions.
 

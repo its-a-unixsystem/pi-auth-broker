@@ -7,10 +7,6 @@
  * under the credential-store lock when tokens near expiry, and auth.json
  * persistence is pi-owned. We add a long-poll watcher and 401 recovery.
  *
- * Additionally registers the nanogpt OpenAI-compatible provider when the
- * broker holds its api_key credential — auth wiring only; the model catalog
- * comes from the user's ~/.pi/agent/models.json (merged natively by pi).
- *
  * Load with:  pi -e ./index.ts   (or drop into ~/.pi/agent/extensions/)
  */
 
@@ -45,14 +41,7 @@ const MANAGED = new Map<string, { brokerProvider: string; display: string }>(
 	Object.entries(PROVIDERS).map(([brokerProvider, v]) => [v.pi, { brokerProvider, display: v.display }]),
 );
 
-/**
- * nanogpt: OpenAI-compatible aggregator (https://nano-gpt.com/api/v1), served by
- * the broker as an `api_key` credential. The extension wires auth only — model
- * entries come from the user's ~/.pi/agent/models.json under providers.nanogpt.
- */
-const NANOGPT_BASE_URL = "https://nano-gpt.com/api/v1";
-
-export default async function (pi: ExtensionAPI) {
+export default function (pi: ExtensionAPI) {
 	const config = resolveConfig();
 
 	if (!config || !config.token) {
@@ -82,24 +71,6 @@ export default async function (pi: ExtensionAPI) {
 				getApiKey: (credentials) => oauth.getApiKey(credentials),
 			},
 		});
-	}
-
-	// --- nanogpt: broker api_key → OpenAI-compatible provider (auth wiring only) ---
-	// ponytail: literal key registered at load; rotates on pi restart after a broker
-	// re-login. Re-register on snapshot generation bumps if key rotation ever matters.
-	try {
-		// Bounded so an unreachable broker doesn't stall extension load.
-		const snap = await broker.snapshotRequest({ signal: AbortSignal.timeout(4000) });
-		const nano = snap?.credentials.find((c) => c.provider === "nanogpt");
-		if (nano?.credential.type === "api_key" && typeof nano.credential.key === "string") {
-			pi.registerProvider("nanogpt", {
-				baseUrl: NANOGPT_BASE_URL,
-				apiKey: nano.credential.key,
-			});
-		}
-	} catch {
-		// Broker unreachable at load — nanogpt stays unregistered this session; the
-		// session_start handler reports broker reachability separately.
 	}
 
 	// --- Long-poll watcher (starts on session_start, aborts on session_shutdown) ---
@@ -241,18 +212,15 @@ export default async function (pi: ExtensionAPI) {
 			}
 			for (const c of snap?.credentials ?? []) {
 				const known = PROVIDERS[c.provider];
-				const isNano = c.provider === "nanogpt" && c.credential.type === "api_key";
-				const account = c.credential.email ?? c.credential.accountId ?? (isNano ? "api key" : "?");
+				const account = c.credential.email ?? c.credential.accountId ?? "?";
 				const expiresIn =
 					// Guard against second-precision epochs (pre-2001 in ms) or missing values.
 					typeof c.credential.expires === "number" && c.credential.expires > 1e12 && snap
 						? formatDuration(c.credential.expires - snap.serverNowMs)
-						: isNano
-							? "never (static key)"
-							: "?";
-				const scope = known ? "" : isNano ? " (api-key)" : " (not managed)";
+						: "?";
+				const scope = known ? "" : " (not managed)";
 				const active = known && readStoredCredential(known.pi) ? " [active]" : "";
-				lines.push(`  #${c.id} ${c.provider}${scope}: ${account}, expires ${expiresIn === "?" ? "in ?" : expiresIn}${active}`);
+				lines.push(`  #${c.id} ${c.provider}${scope}: ${account}, expires in ${expiresIn}${active}`);
 			}
 			if (!snap?.credentials.length) lines.push("  (no credentials)");
 			ctx.ui.notify(lines.join("\n"), "info");
